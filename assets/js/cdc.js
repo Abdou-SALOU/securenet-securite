@@ -205,6 +205,11 @@ interface s0/0/0
             { label: "permit tcp any any eq 80", correct: false, fb: "Trop large : autoriserait n'importe qui vers n'importe quoi." },
             { label: "permit ip 192.168.1.0 0.0.0.255 host 192.168.2.250", correct: false, fb: "Trop permissif (tout IP) ; le besoin est HTTP/HTTPS uniquement." }
           ], explain: "On colle la règle au besoin : bon réseau source, bon hôte destination, bon port (+ une règle pour 443)." },
+        { ask: "⚠️ Piège du prof : besoin 2 = <code>permit tcp 192.168.1.0 0.0.0.255 any eq 80</code>. Mais <b>any inclut LAN2</b> — tout LAN2 deviendrait joignable en web, pas seulement .250 ! Que fait le prof ?", options: [
+            { label: "Insérer deny tcp 192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255 eq 80 AVANT le permit … any eq 80", correct: true, fb: "Exact — c'est LA signature de sa correction : un deny ciblé intercalé avant le permit générique. La 1ʳᵉ règle qui correspond gagne, donc le web vers LAN2 (hors .250 déjà permis plus haut) est bloqué." },
+            { label: "Rien : le deny ip any any final suffit", correct: false, fb: "Non ! Le deny final ne s'applique que si AUCUNE règle ne correspond avant. Or le permit … any eq 80 correspondrait déjà au web vers LAN2." },
+            { label: "Mettre le permit … any eq 80 tout en haut de l'ACL", correct: false, fb: "Au contraire : plus un permit est général, plus il descend ; les exceptions (deny ciblés) passent avant." }
+          ], explain: "Ordre du prof : permit précis (.250) → deny ciblé LAN1→LAN2 → permit générique (any). Même schéma pour le DNS (deny … eq 53 vers LAN2 avant permit … any eq 53)." },
         { ask: "Besoin 6 : seule <b>192.168.1.20</b> peut pinger LAN2. Quelle règle ?", options: [
             { label: "permit icmp host 192.168.1.20 192.168.2.0 0.0.0.255 echo", correct: true, fb: "Exact : un seul hôte source (host), tout LAN2 en destination, echo (la requête ping)." },
             { label: "permit icmp 192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255 echo", correct: false, fb: "Cela autoriserait TOUT LAN1 à pinger, pas seulement .20." },
@@ -221,42 +226,54 @@ interface s0/0/0
             { label: "permit udp any any", correct: false, fb: "Cela autoriserait tout l'UDP — l'inverse du besoin." }
           ], explain: "Le deny implicite est ton ami : autorise seulement le strict nécessaire, le reste est bloqué d'office." }
       ],
-      solution: cli("Corrigé — ACL E0 in (trafic de LAN1)",
-`ip access-list extended LAN1_IN
- deny   ip  host 192.168.1.21 any                              ! (7) blocage ciblé EN PREMIER
- permit tcp 192.168.1.0 0.0.0.255 host 192.168.2.250 eq 80     ! (1) serveur web LAN2
- permit tcp 192.168.1.0 0.0.0.255 host 192.168.2.250 eq 443    ! (1)
+      solution: note("tip", "Correction <b>exacte du professeur</b> (tableau rouge) : 3 ACL numérotées — <b>100 → E0 in</b>, <b>120 → E1 in</b>, <b>130 → S0 in</b>. Sa signature : des <b>deny ciblés intercalés AVANT chaque permit générique</b>, car <code>any</code> inclut LAN2 !") +
+      cli("Corrigé du prof — ACL 100 (E0, in) : trafic venant de LAN1",
+`ip access-list extended 100
+ deny   ip   host 192.168.1.21 any                             ! (7) blocage .21 EN PREMIER
+ permit tcp  192.168.1.0 0.0.0.255 host 192.168.2.250 eq 80    ! (1) SEUL le serveur .250
+ permit tcp  192.168.1.0 0.0.0.255 host 192.168.2.250 eq 443   ! (1)
+ deny   tcp  192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255 eq 80     ! bloque le web vers le RESTE de LAN2
+ deny   tcp  192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255 eq 443    ! (car « any » ci-dessous inclurait LAN2 !)
+ permit tcp  192.168.1.0 0.0.0.255 any eq 80                   ! (2) web Internet
+ permit tcp  192.168.1.0 0.0.0.255 any eq 443                  ! (2)
+ deny   udp  192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255 eq 53     ! pas de DNS vers LAN2
+ deny   tcp  192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255 eq 53
+ permit udp  192.168.1.0 0.0.0.255 any eq 53                   ! (3) DNS Internet
+ permit tcp  192.168.1.0 0.0.0.255 any eq 53                   ! (3)
  permit icmp host 192.168.1.20 192.168.2.0 0.0.0.255 echo      ! (6) seul .20 ping LAN2
- permit tcp 192.168.1.0 0.0.0.255 any eq 80                    ! (2) web Internet
- permit tcp 192.168.1.0 0.0.0.255 any eq 443                   ! (2)
- permit udp 192.168.1.0 0.0.0.255 any eq 53                    ! (3) DNS UDP
- permit tcp 192.168.1.0 0.0.0.255 any eq 53                    ! (3) DNS TCP
- deny   ip  any any                                            ! (9)(10) tout le reste
+ deny   ip   any any                                           ! (10) deny final
 !
 interface e0
- ip access-group LAN1_IN in`) +
-      cli("Corrigé — ACL E1 in (trafic de LAN2, + retours vers LAN1)",
-`ip access-list extended LAN2_IN
- permit tcp 192.168.2.0 0.0.0.255 any eq 80                       ! (4)
- permit tcp 192.168.2.0 0.0.0.255 any eq 443                      ! (4)
- permit udp 192.168.2.0 0.0.0.255 any eq 53                       ! (5)
- permit tcp 192.168.2.0 0.0.0.255 any eq 53                       ! (5)
- permit tcp host 192.168.2.250 192.168.1.0 0.0.0.255 established  ! réponses serveur -> LAN1 (1)
- permit icmp 192.168.2.0 0.0.0.255 host 192.168.1.20 echo-reply   ! réponses ping -> .20 (6)
- deny   ip  any any
+ ip access-group 100 in`) +
+      cli("Corrigé du prof — ACL 120 (E1, in) : trafic venant de LAN2 + retours du serveur",
+`ip access-list extended 120
+ deny   udp  192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255 eq 53     ! pas de DNS vers LAN1
+ deny   tcp  192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255 eq 53
+ permit udp  192.168.2.0 0.0.0.255 any eq 53                   ! (5) DNS Internet
+ permit tcp  192.168.2.0 0.0.0.255 any eq 53                   ! (5)
+ permit tcp  host 192.168.2.250 eq 80 192.168.1.0 0.0.0.255 established   ! (1) RÉPONSES du serveur
+ permit tcp  host 192.168.2.250 eq 443 192.168.1.0 0.0.0.255 established  !     (port SOURCE 80/443)
+ deny   tcp  192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255 eq 80     ! bloque le web vers LAN1
+ deny   tcp  192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255 eq 443
+ permit tcp  192.168.2.0 0.0.0.255 any eq 80                   ! (4) web Internet
+ permit tcp  192.168.2.0 0.0.0.255 any eq 443                  ! (4)
+ permit icmp 192.168.2.0 0.0.0.255 host 192.168.1.20 echo-reply    ! (6) réponses ping -> .20
+ deny   ip   any any                                           ! (10)
 !
 interface e1
- ip access-group LAN2_IN in`) +
-      cli("Corrigé — ACL S0 in (retour d'Internet uniquement)",
-`ip access-list extended NET_IN
- permit tcp any any established        ! réponses web établies (2)(4)
- permit udp any eq 53 any              ! réponses DNS (3)(5)
- deny   ip  any host 192.168.2.250     ! (8) Internet ne joint jamais le serveur
- deny   ip  any any                    ! (10) deny par défaut
+ ip access-group 120 in`) +
+      cli("Corrigé du prof — ACL 130 (S0, in) : retour d'Internet uniquement",
+`ip access-list extended 130
+ deny   ip   any host 192.168.1.21        ! (7) personne ne joint .21
+ permit udp  any eq 53 any                ! (3)(5) réponses DNS (port SOURCE 53)
+ permit tcp  any eq 53 any
+ permit tcp  any eq 80 any established    ! (2)(4) réponses web établies
+ permit tcp  any eq 443 any established
+ deny   ip   any any                      ! (8)(10) .250 injoignable + deny par défaut
 !
 interface s0
- ip access-group NET_IN in`) +
-      note("exam", "Méthode gagnante : <b>1 ACL par interface, en entrée</b> ; les <b>deny ciblés en tête</b>, les <b>permit du plus précis au plus large</b>, et on s'appuie sur le <b>deny implicite</b>. Côté Internet entrant, on n'autorise que les <b>retours</b>.")
+ ip access-group 130 in`) +
+      note("exam", "La structure du prof : <b>1 ACL numérotée par interface, en entrée</b> (100→E0, 120→E1, 130→S0). Dans chaque liste : <b>deny ciblés AVANT le permit générique</b> qu'ils corrigent (car <code>any</code> inclut LAN2 !), retours par <b>port source</b> (<code>eq 80/53</code> côté source) + <code>established</code> / <code>echo-reply</code>, et <b>deny ip any any</b> final. Aucun permit vers .250 sur S0 → besoin (8) garanti.")
     },
 
     /* ---------- 2 · NAT + PAT (cahier des charges) ---------- */
@@ -385,17 +402,18 @@ interface s0/0/0                      ! OUTSIDE
   /* ---- Phase Construction : règles à assembler (+ distracteurs) par cahier ---- */
   const BUILDS = {
     "ex1-acl": {
-      title: "Assemble l'<b>ACL LAN1_IN</b> (version essentielle) dans le BON ORDRE — appliquée en entrée sur E0.",
+      title: "Assemble l'<b>ACL 100 (E0, in)</b> du prof — version essentielle, dans le BON ORDRE.",
       orderMatters: true,
       target: [
         "deny ip host 192.168.1.21 any",
         "permit tcp 192.168.1.0 0.0.0.255 host 192.168.2.250 eq 80",
+        "deny tcp 192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255 eq 80",
         "permit tcp 192.168.1.0 0.0.0.255 any eq 80",
         "permit udp 192.168.1.0 0.0.0.255 any eq 53",
         "deny ip any any"
       ],
       distractors: ["permit ip host 192.168.1.21 any", "permit ip any any"],
-      tip: "Le blocage ciblé de .21 vient AVANT les permit ; le deny ip any any termine la liste."
+      tip: "Structure du prof : deny .21 EN PREMIER → permit le serveur .250 → deny le web vers le RESTE de LAN2 (car « any » l'inclurait !) → permit web/DNS Internet → deny final."
     },
     "nat-pat": {
       title: "Sélectionne les <b>commandes NAT</b> correctes (évite les pièges : overload, sens du static).",
