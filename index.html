@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SecureNet · Sécurité des Systèmes et Réseaux</title>
+<meta name="description" content="Plateforme de révision PRATIQUE : NAT/PAT, GRE, ACL & CBAC, architecture de sécurité — labs Cisco IOS simulés + cahiers des charges guidés.">
+<meta name="theme-color" content="#0b1020" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#eef2fb" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SecureNet">
+<link rel="stylesheet" href="assets/css/style.css?v=8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+</head>
+<body>
+
+<!-- ============ SPLASH / INTRO ============ -->
+<div id="splash" class="splash">
+  <div class="splash-inner">
+    <div class="splash-logo">
+      <svg viewBox="0 0 120 120" width="96" height="96" aria-hidden="true">
+        <g class="splash-net">
+          <line x1="60" y1="20" x2="26" y2="40"/><line x1="60" y1="20" x2="94" y2="40"/>
+          <line x1="26" y1="40" x2="26" y2="72"/><line x1="94" y1="40" x2="94" y2="72"/>
+          <line x1="26" y1="72" x2="60" y2="98"/><line x1="94" y1="72" x2="60" y2="98"/>
+        </g>
+        <path d="M60 22 L94 38 V66 C94 84 79 94 60 100 C41 94 26 84 26 66 V38 Z" fill="none" stroke="#10b981" stroke-width="2.4" opacity=".6"/>
+        <circle cx="60" cy="20" r="7" class="node n1"/>
+        <circle cx="26" cy="40" r="7" class="node n2"/>
+        <circle cx="94" cy="40" r="7" class="node n3"/>
+        <circle cx="60" cy="98" r="7" class="node n4"/>
+        <circle cx="60" cy="58" r="9" class="node n5"/>
+        <path d="M52 58 l6 6 l12 -13" fill="none" stroke="#0b1020" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h1 class="splash-title">Secure<span>Net</span></h1>
+    <p class="splash-sub">Sécurité des Systèmes &amp; Réseaux · 2CI-ISI</p>
+    <div class="splash-bar"><span></span></div>
+    <p class="splash-hint">Chargement des modules…</p>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app" class="app hidden">
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar">
+    <div class="brand" data-nav="home">
+      <div class="brand-mark">
+        <svg viewBox="0 0 32 32" width="30" height="30"><path d="M16 3l11 5v8c0 7-5 11-11 13C10 26 5 23 5 16V8l11-5z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11.5 16l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="brand-text"><strong>SecureNet</strong><span>Sécurité Réseaux</span></div>
+    </div>
+
+    <div class="exam-countdown" id="examBadge"></div>
+
+    <nav class="nav" id="nav"></nav>
+
+    <div class="sidebar-foot">
+      <button class="ghost-btn" data-nav="cdc"><span class="ico">📋</span> Cahiers des charges</button>
+      <button class="ghost-btn" data-nav="lab"><span class="ico">🖥️</span> Labs CLI</button>
+      <button class="ghost-btn" data-nav="exam"><span class="ico">🎯</span> Mode Examen</button>
+      <button class="ghost-btn" data-nav="flashcards"><span class="ico">🃏</span> Flashcards</button>
+      <button class="ghost-btn" data-nav="cheatsheet"><span class="ico">⌨️</span> Mémo commandes</button>
+    </div>
+  </aside>
+
+  <div class="sidebar-scrim" id="scrim"></div>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-toggle" id="menuToggle" aria-label="Menu">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="crumbs" id="crumbs"></div>
+      <div class="topbar-actions">
+        <div class="global-progress" id="globalProgress" title="Progression globale">
+          <svg viewBox="0 0 36 36" width="38" height="38">
+            <path class="gp-track" d="M18 2.5a15.5 15.5 0 1 1 0 31 15.5 15.5 0 0 1 0-31"/>
+            <path class="gp-fill" id="gpFill" d="M18 2.5a15.5 15.5 0 1 1 0 31 15.5 15.5 0 0 1 0-31"/>
+          </svg>
+          <span id="gpText">0%</span>
+        </div>
+        <button class="icon-btn" id="themeToggle" aria-label="Thème">
+          <svg class="i-moon" viewBox="0 0 24 24" width="20" height="20"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="currentColor"/></svg>
+          <svg class="i-sun" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M19.4 4.6l-2.1 2.1M6.7 17.3l-2.1 2.1"/></g></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="content" id="view"></main>
+
+    <footer class="appfoot">
+      <span>SecureNet — révisions Sécurité des Systèmes &amp; Réseaux · 2CI-ISI · d'après les supports & ateliers du module</span>
+      <span id="resetWrap"><button class="link-btn" id="resetProgress">Réinitialiser ma progression</button></span>
+    </footer>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<!-- ============ DATA + LOGIC ============ -->
+<script src="assets/js/diagrams.js?v=8"></script>
+<script src="assets/js/gamify.js?v=8"></script>
+<script src="assets/js/data-nat.js?v=8"></script>
+<script src="assets/js/data-gre.js?v=8"></script>
+<script src="assets/js/data-acl.js?v=8"></script>
+<script src="assets/js/data-aclctx.js?v=8"></script>
+<script src="assets/js/data-archi.js?v=8"></script>
+<script src="assets/js/data-exam.js?v=8"></script>
+<script src="assets/js/labs-data.js?v=8"></script>
+<script src="assets/js/cli-sim.js?v=8"></script>
+<script src="assets/js/cdc.js?v=8"></script>
+<script src="assets/js/app.js?v=8"></script>
+</body>
+</html>

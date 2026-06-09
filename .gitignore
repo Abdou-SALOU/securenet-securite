@@ -1,0 +1,10 @@
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# Fichiers temporaires de prévisualisation
+_preview_*.png
+_shot_*.png
+.preview-tools/
